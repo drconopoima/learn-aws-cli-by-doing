@@ -54,7 +54,7 @@ aws --region="${AWS_DEFAULT_REGION}" s3api get-public-access-block --bucket "${S
 # clone project folder
 git clone https://github.com/tia-la/ccp.git
 cd ccp || exit
-aws s3 sync ./ "s3://${S3_BUCKET_NAME}"
+aws --region="${AWS_DEFAULT_REGION}" s3 sync ./ "s3://${S3_BUCKET_NAME}"
 ##### Create lifecycle transition to Glacier S3 objects of prefix pinehead
 cat<<EOF>pinehead_lifecycle.json
 {
@@ -85,11 +85,146 @@ cat<<EOF>pinehead_lifecycle.json
     ]
 }
 EOF
-aws s3api put-bucket-lifecycle-configuration --bucket "${S3_BUCKET_NAME}" --lifecycle-configuration file://pinehead_lifecycle.json
+aws --region="${AWS_DEFAULT_REGION}" s3api put-bucket-lifecycle-configuration --bucket "${S3_BUCKET_NAME}" --lifecycle-configuration file://pinehead_lifecycle.json
 # SILENT SUCCESS: No output given
-aws s3api get-bucket-lifecycle-configuration --bucket "${S3_BUCKET_NAME}" | cat
+aws --region="${AWS_DEFAULT_REGION}" s3api get-bucket-lifecycle-configuration --bucket "${S3_BUCKET_NAME}" | cat
 # RULES   sample-s3-to-glacier-rule   Enabled
 # EXPIRATION  730
 # FILTER  pinehead
 # NONCURRENTVERSIONTRANSITIONS    1   15  DEEP_ARCHIVE
 # TRANSITIONS 30  GLACIER
+#### Configure S3 Bucket to Host a Static Website with a Custom Domain
+## Route 53 List Hosted Zones
+aws --region="${AWS_DEFAULT_REGION}" route53 list-hosted-zones --output json | jq
+# {
+#   "HostedZones": [
+#     {
+#       "Id": "/hostedzone/Z06776831VVYJZODRDBD9",
+#       "Name": "xxxremovedxxx.info.",
+#       "CallerReference": "xxxremovedxxx.info2020-05-05 18:08:38.260245",
+#       "Config": {
+#         "Comment": "",
+#         "PrivateZone": false
+#       },
+#       "ResourceRecordSetCount": 2
+#     }
+#   ]
+# }
+## Route 53 List Records of Hosted Zone
+aws --region="${AWS_DEFAULT_REGION}" route53 list-resource-record-sets --hosted-zone-id Z06776831VVYJZODRDBD9 --output json | jq
+# {
+#   "ResourceRecordSets": [
+#     {
+#       "Name": "xxxremovedxxx.info.",
+#       "Type": "NS",
+#       "TTL": 172800,
+#       "ResourceRecords": [
+#         {
+#           "Value": "ns-1162.awsdns-17.org."
+#         }
+#       ]
+#     },
+#     {
+#       "Name": "xxxremovedxxx.info.",
+#       "Type": "SOA",
+#       "TTL": 900,
+#       "ResourceRecords": [
+#         {
+#           "Value": "ns-1162.awsdns-17.org. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
+#         }
+#       ]
+#     }
+#   ]
+# }
+## Create S3 bucket with the name of the public domain and public access
+aws --region="${AWS_DEFAULT_REGION}" s3api create-bucket --bucket xxxremovedxxx.info --acl public-read --output text | cat
+## Upload static website files
+for item in *.html; do aws --region="${AWS_DEFAULT_REGION}" s3 cp "./${item}" s3://xxxremovedxxx.info/; done
+## Enable S3 Bucket status website hosting
+aws --region="${AWS_DEFAULT_REGION}" s3 website s3://xxxremovedxxx.info/ --index-document index.html --error-document error.html
+## Route 53 Create Alias A record
+# S3 Hosting Zone Map Reference https://gist.github.com/matalo33/abc6a40858ead3bf63501f48474426c2
+cat<<EOF>xxxremovedxxx.info_delete_s3_record.json
+{
+  "Comment": "Deleting Alias xxxremovedxxx.info",
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+            "Name": "xxxremovedxxx.info",
+            "Type": "A",
+            "AliasTarget": {
+                "HostedZoneId": "Z3AQBSTGFYJSTF",
+                "DNSName": "xxxremovedxxx.info.s3-website-us-east-1.amazonaws.com",
+                "EvaluateTargetHealth": false
+            }
+        }
+    }
+  ]
+}
+EOF
+aws --region="${AWS_DEFAULT_REGION}" route53 change-resource-record-sets --hosted-zone-id Z06776831VVYJZODRDBD9 --change-batch file://xxxremovedxxx.info_create_s3_record.json --output json | jq
+# {
+#   "ChangeInfo": {
+#     "Id": "/change/C083286627PAAPSDU2CRX",
+#     "Status": "PENDING",
+#     "SubmittedAt": "2022-02-23T22:17:49.467000+00:00",
+#     "Comment": "Creating Alias xxxremovedxxx.info"
+#   }
+# }
+### Errors
+# Parameter Validation failed: Missing required parameter in ChangeBatch.Changes[0]: "ResourceRecordSet"
+# Unknown parameter in ChangeBatch.Changes[0].ResourceRecordSet: "ResourceRecord", must be one of: Name, Type, SetIdentifier, Weight, Region, GeoLocation, Failover, MultiValueAnswer, TTL, ResourceRecords, AliasTarget, HealthCheckId, TrafficPolicyInstanceId
+### Invalid JSON
+# Error parsing parameter '--change-batch': Invalid JSON: Expecting ',' delimiter: line 10 column 13 (char 227)
+### Missing mandatory fields All of TTL, ResourceRecords
+# An error occurred (InvalidInput) when calling the ChangeResourceRecordSets operation: Invalid request: Expected exactly one of [AliasTarget, all of [TTL, and ResourceRecords], or TrafficPolicyInstanceId], but found none in Change with [Action=CREATE, Name=xxxremovedxxx.info, Type=CNAME, SetIdentifier=null]
+### Invalid change batch (permissions)
+# An error occurred (InvalidChangeBatch) when calling the ChangeResourceRecordSets operation: [RRSet of type CNAME with DNS name xxxremovedxxx.info. is not permitted at apex in zone xxxremovedxxx.info.]
+### Record already exists. To resolve, delete existint record and recreate
+# An error occurred (InvalidChangeBatch) when calling the ChangeResourceRecordSets operation: [Tried to create resource record set [name='xxxremovedxxx.info.', type='A'] but it already exists]
+
+## Route 53 Delete record
+cat<<EOF>xxxremovedxxx.info_delete_s3_record.json
+{
+  "Comment": "Deleting Alias xxxremovedxxx.info",
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+            "Name": "xxxremovedxxx.info",
+            "Type": "A",
+            "AliasTarget": {
+                "HostedZoneId": "Z3AQBSTGFYJSTF",
+                "DNSName": "xxxremovedxxx.info.s3-website-us-east-1.amazonaws.com",
+                "EvaluateTargetHealth": false
+            }
+        }
+    }
+  ]
+}
+EOF
+aws --region="${AWS_DEFAULT_REGION}" route53 change-resource-record-sets --hosted-zone-id Z06776831VVYJZODRDBD9 --change-batch file://xxxremovedxxx.info_delete_s3_record.json --output json | jq
+# {
+#   "ChangeInfo": {
+#     "Id": "/change/C08882171JXGD4EIJJZT8",
+#     "Status": "PENDING",
+#     "SubmittedAt": "2022-02-23T22:27:42.461000+00:00",
+#     "Comment": "Deleting Alias xxxremovedxxx.info.info"
+#   }
+# }
+### Errors
+### Record doesn't exist: not found
+# An error occurred (InvalidChangeBatch) when calling the ChangeResourceRecordSets operation: [Tried to delete resource record set [name='xxxremovedxxx.info.', type='A'] but it was not found]
+
+### Route 53 retrieve resource record sets
+aws --region="${AWS_DEFAULT_REGION}" route53 list-resource-record-sets --hosted-zone-id Z06776831VVYJZODRDBD9 --output json | jq
+# {
+#     "Name": "xxxremovedxxx.info.",
+#     "Type": "A",
+#     "AliasTarget": {
+#     "HostedZoneId": "Z3AQBSTGFYJSTF",
+#     "DNSName": "xxxremovedxxx.info.s3-website-us-east-1.amazonaws.com.",
+#     "EvaluateTargetHealth": false
+#     }
+# },
