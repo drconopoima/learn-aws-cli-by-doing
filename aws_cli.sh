@@ -170,7 +170,7 @@ aws --region="${AWS_DEFAULT_REGION}" route53 change-resource-record-sets --hoste
 #     "Id": "/change/C083286627PAAPSDU2CRX",
 #     "Status": "PENDING",
 #     "SubmittedAt": "2022-02-23T22:17:49.467000+00:00",
-#     "Comment": "Creating Alias xxxremovedxxx.info"
+#     "Comment": "Create Alias xxxremovedxxx.info"
 #   }
 # }
 ### Errors
