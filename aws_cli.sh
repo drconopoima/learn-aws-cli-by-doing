@@ -143,13 +143,14 @@ for item in *.html; do aws --region="${AWS_DEFAULT_REGION}" s3 cp "./${item}" s3
 ## Enable S3 Bucket status website hosting
 aws --region="${AWS_DEFAULT_REGION}" s3 website s3://xxxremovedxxx.info/ --index-document index.html --error-document error.html
 ## Route 53 Create Alias A record
-# S3 Hosting Zone Map Reference https://gist.github.com/matalo33/abc6a40858ead3bf63501f48474426c2
-cat<<EOF>xxxremovedxxx.info_delete_s3_record.json
+# S3 Hosted Zone ID Reference https://docs.aws.amazon.com/general/latest/gr/s3.html
+# ELB Hosted Zone ID Reference https://docs.aws.amazon.com/general/latest/gr/elb.html
+cat<<EOF>xxxremovedxxx.info_create_s3_record.json
 {
-  "Comment": "Deleting Alias xxxremovedxxx.info",
+  "Comment": "Create Alias xxxremovedxxx.info",
   "Changes": [
     {
-      "Action": "DELETE",
+      "Action": "CREATE",
       "ResourceRecordSet": {
             "Name": "xxxremovedxxx.info",
             "Type": "A",
@@ -187,7 +188,7 @@ aws --region="${AWS_DEFAULT_REGION}" route53 change-resource-record-sets --hoste
 ## Route 53 Delete record
 cat<<EOF>xxxremovedxxx.info_delete_s3_record.json
 {
-  "Comment": "Deleting Alias xxxremovedxxx.info",
+  "Comment": "Delete Alias xxxremovedxxx.info",
   "Changes": [
     {
       "Action": "DELETE",
@@ -210,12 +211,14 @@ aws --region="${AWS_DEFAULT_REGION}" route53 change-resource-record-sets --hoste
 #     "Id": "/change/C08882171JXGD4EIJJZT8",
 #     "Status": "PENDING",
 #     "SubmittedAt": "2022-02-23T22:27:42.461000+00:00",
-#     "Comment": "Deleting Alias xxxremovedxxx.info.info"
+#     "Comment": "Delete Alias xxxremovedxxx.info"
 #   }
 # }
 ### Errors
 ### Record doesn't exist: not found
 # An error occurred (InvalidChangeBatch) when calling the ChangeResourceRecordSets operation: [Tried to delete resource record set [name='xxxremovedxxx.info.', type='A'] but it was not found]
+### Record doesn't match
+# Error: Tried to delete resource record set [name='xxxremovedxxx.info.', type='A'] but the values provided do not match the current values
 
 ### Route 53 retrieve resource record sets
 aws --region="${AWS_DEFAULT_REGION}" route53 list-resource-record-sets --hosted-zone-id Z06776831VVYJZODRDBD9 --output json | jq
