@@ -231,3 +231,34 @@ aws --region="${AWS_DEFAULT_REGION}" route53 list-resource-record-sets --hosted-
 #     "EvaluateTargetHealth": false
 #     }
 # },
+### Add Public Hosted Zone.
+## aws create-hosted-zone --name <value>
+###   --caller-reference <value>
+###   --hosted-zone-config "PrivateZone=false,Comment=<string>"
+aws route53 --region="${AWS_DEFAULT_REGION}" create-hosted-zone --name example.com --caller-reference "$(date +'%Y-%m-%d_%H-%M')" --hosted-zone-config "PrivateZone=false" --output json | jq '.'
+# {
+#   "Location": "https://route53.amazonaws.com/2013-04-01/hostedzone/Z10XXXXXXXXXXXXXXXXXX",
+#   "HostedZone": {
+#     "Id": "/hostedzone/Z10XXXXXXXXXXXXXXXXXX",
+#     "Name": "example.com.",
+#     "CallerReference": "2024-05-27_00-47",
+#     "Config": {
+#       "PrivateZone": false
+#     },
+#     "ResourceRecordSetCount": 2
+#   },
+#   "ChangeInfo": {
+#     "Id": "/change/C0XXXXXXXXXXXXXXXXXX",
+#     "Status": "PENDING",
+#     "SubmittedAt": "2024-05-26T22:47:45.970000+00:00"
+#   },
+#   "DelegationSet": {
+#     "NameServers": [
+#       "ns-###.awsdns-##.net",
+#       "ns-####.awsdns-##.co.uk",
+#       "ns-##.awsdns-##.com",
+#       "ns-####.awsdns-##.org"
+#     ]
+#   }
+# }
+
